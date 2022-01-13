@@ -28,11 +28,13 @@ import (
 
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdexternalversions "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
 	kcpclient "github.com/kcp-dev/kcp/pkg/client/clientset/versioned"
 	kcpexternalversions "github.com/kcp-dev/kcp/pkg/client/informers/externalversions"
 	"github.com/kcp-dev/kcp/pkg/reconciler/cluster"
+	"k8s.io/client-go/informers"
 )
 
 const resyncPeriod = 10 * time.Hour
@@ -91,7 +93,9 @@ func main() {
 	}
 	kcpSharedInformerFactory := kcpexternalversions.NewSharedInformerFactoryWithOptions(kcpclient.NewForConfigOrDie(r), resyncPeriod)
 	crdSharedInformerFactory := crdexternalversions.NewSharedInformerFactoryWithOptions(apiextensionsclient.NewForConfigOrDie(r), resyncPeriod)
-	if err := options.Options.Complete(kubeconfig, kcpSharedInformerFactory, crdSharedInformerFactory).Start(ctx); err != nil {
+	sharedInformerFactory := informers.NewSharedInformerFactoryWithOptions(kubernetes.NewForConfigOrDie(r), resyncPeriod)
+
+	if err := options.Options.Complete(kubeconfig, kcpSharedInformerFactory, crdSharedInformerFactory, sharedInformerFactory).Start(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

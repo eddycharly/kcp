@@ -37,6 +37,7 @@ import (
 	kcpclient "github.com/kcp-dev/kcp/pkg/client/clientset/versioned"
 	kcpexternalversions "github.com/kcp-dev/kcp/pkg/client/informers/externalversions"
 	"github.com/kcp-dev/kcp/pkg/reconciler/apiresource"
+	"k8s.io/client-go/informers"
 )
 
 // DefaultOptions are the default options for the cluster controller.
@@ -79,12 +80,18 @@ func (o *Options) Validate() error {
 	return nil
 }
 
-func (o *Options) Complete(kubeconfig clientcmdapi.Config, kcpSharedInformerFactory kcpexternalversions.SharedInformerFactory, crdSharedInformerFactory crdexternalversions.SharedInformerFactory) *Config {
+func (o *Options) Complete(
+	kubeconfig clientcmdapi.Config,
+	kcpSharedInformerFactory kcpexternalversions.SharedInformerFactory,
+	crdSharedInformerFactory crdexternalversions.SharedInformerFactory,
+	sharedInformerFactory informers.SharedInformerFactory,
+) *Config {
 	return &Config{
 		Options:                  o,
 		kubeconfig:               kubeconfig,
 		kcpSharedInformerFactory: kcpSharedInformerFactory,
 		crdSharedInformerFactory: crdSharedInformerFactory,
+		sharedInformerFactory:    sharedInformerFactory,
 	}
 }
 
@@ -93,6 +100,7 @@ type Config struct {
 	kubeconfig               clientcmdapi.Config
 	kcpSharedInformerFactory kcpexternalversions.SharedInformerFactory
 	crdSharedInformerFactory crdexternalversions.SharedInformerFactory
+	sharedInformerFactory    informers.SharedInformerFactory
 }
 
 func (c *Config) Start(ctx context.Context) error {
@@ -156,10 +164,21 @@ func (c *Config) Start(ctx context.Context) error {
 		return err
 	}
 
+	healthController, err := NewHealthCheckController(
+		kcpClient,
+		c.kcpSharedInformerFactory.Cluster().V1alpha1().Clusters(),
+		c.sharedInformerFactory.Coordination().V1().Leases(),
+	)
+	if err != nil {
+		return err
+	}
+
 	c.kcpSharedInformerFactory.Start(ctx.Done())
 	c.crdSharedInformerFactory.Start(ctx.Done())
+	c.sharedInformerFactory.Start(ctx.Done())
 	go clusterController.Start(ctx, c.NumThreads)
 	go apiresourceController.Start(ctx, c.NumThreads)
+	go healthController.Start(ctx, c.NumThreads)
 
 	return nil
 }

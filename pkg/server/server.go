@@ -530,6 +530,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 		kcpSharedInformerFactory := kcpexternalversions.NewSharedInformerFactoryWithOptions(kcpclient.NewForConfigOrDie(adminConfig), resyncPeriod)
 		crdSharedInformerFactory := apiextensionsexternalversions.NewSharedInformerFactoryWithOptions(apiextensionsclient.NewForConfigOrDie(adminConfig), resyncPeriod)
+		sharedInformerFactory := informers.NewSharedInformerFactoryWithOptions(kubernetes.NewForConfigOrDie(adminConfig), resyncPeriod)
 
 		kubeconfig := clientConfig.DeepCopy()
 		for _, cluster := range kubeconfig.Clusters {
@@ -547,7 +548,7 @@ func (s *Server) Run(ctx context.Context) error {
 			}
 
 			adaptedCtx := adaptContext(context)
-			return s.cfg.ClusterControllerOptions.Complete(*kubeconfig, kcpSharedInformerFactory, crdSharedInformerFactory).Start(adaptedCtx)
+			return s.cfg.ClusterControllerOptions.Complete(*kubeconfig, kcpSharedInformerFactory, crdSharedInformerFactory, sharedInformerFactory).Start(adaptedCtx)
 		}); err != nil {
 			return err
 		}
